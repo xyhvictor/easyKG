@@ -1,12 +1,13 @@
 import os
+import re
 from config import conf
 
 
-def merge_sub_file(src_dir, dest_file):
-    fout = open(dest_file, 'w')
-    file_list = os.listdir(src_dir)
+def merge_sub_file(in_dir, out_file):
+    fout = open(out_file, 'w')
+    file_list = os.listdir(in_dir)
     for i in file_list:
-        fin = open(src_dir + i, 'r')
+        fin = open(in_dir + i, 'r')
         try:
             for line in fin:
                 fout.writelines(line)
@@ -15,34 +16,70 @@ def merge_sub_file(src_dir, dest_file):
     fout.close()
 
 
-def mk_sub_file(buf, out_dir, file_name, sub):
-    [des_filename, extname] = os.path.splitext(file_name)
-    filename = des_filename + '_' + str(sub) + extname
-    filename = out_dir + filename
-    print('make file: %s' % filename)
-    fout = open(filename, 'w')
+def mk_sub_file(buf, out_file_path, sub):
+    if sub != -1:
+        [des_filename, extname] = os.path.splitext(out_file_path)
+        out_file_path = des_filename + '_' + str(sub) + extname
+    print('make file: %s' % out_file_path)
+    fout = open(out_file_path, 'w')
     try:
         fout.writelines(buf)
-        return sub + 1
+        return sub + 1 if sub != -1 else -1
     finally:
         fout.close()
 
 
-def split_by_line_count(in_path=conf.src_file_dir + conf.in_file_name, out_dir=conf.sub_src_file_dir,
-                        out_file_name=conf.in_file_name, count=500000):
-    fin = open(in_path, encoding="utf-8")
+def split_by_line_count(in_file_path, out_file_path, count=500000):
+    fin = open(in_file_path, encoding="utf-8")
     try:
         buf = []
         sub = 1
         for line in fin:
             buf.append(line)
             if len(buf) == count:
-                sub = mk_sub_file(buf, out_dir, out_file_name, sub)
+                sub = mk_sub_file(buf, out_file_path, sub)
                 buf = []
         if len(buf) != 0:
-            sub = mk_sub_file(buf, out_dir, out_file_name, sub)
+            sub = mk_sub_file(buf, out_file_path, sub)
     finally:
+        return sub
         fin.close()
+
+
+class Controller:
+    def __init__(self):
+        self.kgp = KGProcessor()
+        self.in_out_file_path = dict()
+        self.in_cache = conf.in_sub_file_dir
+        self.out_cache = conf.out_sub_file_dir
+        self.prepare()
+
+    def prepare(self):
+        split_by_line_count(conf.in_file_dir + conf.in_file_name, self.in_cache + conf.in_file_name)
+        file_name = os.listdir(self.in_cache)
+        for name in file_name:
+            in_path = self.in_cache + name
+            sub = re.findall(r"\d", in_path)
+            out_path = self.out_cache + conf.out_file_name
+            [des_filename, extname] = os.path.splitext(out_path)
+            out_path = des_filename + '_' + ''.join(sub) + extname
+            self.in_out_file_path[in_path] = out_path
+
+    def run(self):
+        while self.in_out_file_path:
+            _in, _out = self.in_out_file_path.popitem()
+            self.kgp.run_extracting_roughly(_in, _out)
+        if conf.clear_cache is True:
+            merge_sub_file(self.out_cache, conf.out_file_dir + conf.out_file_name)
+            self.clear_cache()
+
+    def clear_cache(self):
+        in_cache_file = os.listdir(self.in_cache)
+        out_cache_file = os.listdir(self.out_cache)
+        for name in in_cache_file:
+            os.remove(self.in_cache + name)
+        for name in out_cache_file:
+            os.remove(self.out_cache + name)
 
 
 class KGProcessor:
@@ -57,9 +94,9 @@ class KGProcessor:
         financeKG: 用于存储从csv中根据finance_entity_set集合中实体提取的数据
         finance_words: 领域关键词集合
         black_list: 黑名单集合
-        sub: 用于控制生成子文件
 
     """
+
     def __init__(self):
         self.finance_entity_set = set()
         self.csv = []
@@ -67,7 +104,6 @@ class KGProcessor:
         self.conf = conf
         self.finance_words = self.conf.finance_words
         self.black_list = self.conf.black_list
-        self.sub = 1
 
     def is_in_finance_words(self, pattern):
         for i in self.finance_words:
@@ -110,32 +146,14 @@ class KGProcessor:
             if container[0] in self.finance_entity_set:
                 self.financeKG.append(line)
 
-    def run_extracting_roughly(self, file_path):
-        self.first_open_file(file_path)
+    def run_extracting_roughly(self, in_file_path, out_file_path):
+        self.first_open_file(in_file_path)
         self.second_extract_finance_line_fromCSV()
         self.third_extract_finance_entity_from_financeKG()
         self.fourth_extract_all_finance_line_fromCSV_according_finance_entity()
-        self.sub = mk_sub_file(self.financeKG, self.conf.sub_dest_file_dir, self.conf.out_file_name, self.sub)
-
-    def KGConstruction_first_step(self):
-        print('-'*50 + '\n' + 'start extracting\n' + '-'*50)
-        split_by_line_count()
-        file_list = os.listdir(self.conf.sub_src_file_dir)
-        for i in file_list:
-            self.run_extracting_roughly(self.conf.sub_src_file_dir + i)
-        merge_sub_file(self.conf.sub_dest_file_dir, self.conf.dest_file_dir + self.conf.out_file_name)
-        print('-'*50 + '\n' + 'all files have been extracted\n' + '-'*50)
-        if self.conf.clear_cache is True:
-            print('-'*50 + '\n' + 'clearing file cache....\n' + '-'*50)
-            src_cache = os.listdir(self.conf.sub_src_file_dir)
-            dest_cache = os.listdir(self.conf.sub_dest_file_dir)
-            for i in src_cache:
-                os.remove(self.conf.sub_src_file_dir + i)
-            for i in dest_cache:
-                os.remove(self.conf.sub_dest_file_dir + i)
-            print('-'*50 + '\n' + 'finished\n' + '-'*50)
+        mk_sub_file(self.financeKG, out_file_path, -1)
 
 
 if __name__ == '__main__':
-    kgp = KGProcessor()
-    kgp.KGConstruction_first_step()
+    controller = Controller()
+    controller.run()
