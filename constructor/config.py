@@ -1,5 +1,6 @@
 class Conf:
-    data_dir = '../data/'
+    # 构建领域知识图谱参数
+    data_dir = '../data/CN-DBPedia/'
     in_file_dir = data_dir + 'src/'
     out_file_dir = data_dir + 'dest/'
     in_sub_file_dir = in_file_dir + 'subfile/'
@@ -12,12 +13,16 @@ class Conf:
                      '上市公司', '基金', '上市', '证交所', '债券', '储蓄', '预算', '赤字', '会计', '审计',
                      '物价', '美联储', '通货', '信贷', '外汇', '交易', '股息', '资本', '杠杆', '兼并', '收购',
                      '破产', '资产', '套利'}
-    black_list = {'Ace', 'Aoc', 'CECT', 'HP'}
-
-    attribute_black_list = {'餐厅', '书籍'}
-    attribute_white_list = {'公司'}
+    black_list = {'Ace', 'Aoc', 'CECT', 'HP', '中兴', '海尔', 'Visual'}
 
     clear_cache = True
+    # 构建知识图谱可视化系统所需参数
+    sys_data_dir = '../data/systemData/'
+    sys_attr_file = sys_data_dir + 'attributes.csv'
+    sys_relation_file = sys_data_dir + 'relation.csv'
+    sys_leaf_file = sys_data_dir + 'leaf_list.txt'
+    sys_new_node_file = sys_data_dir + 'new_node.csv'
+    sys_relation_tag_file = sys_data_dir + 'staticResultResult.txt'
 
 
 conf = Conf()

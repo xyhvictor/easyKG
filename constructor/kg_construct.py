@@ -4,10 +4,10 @@ from config import conf
 
 
 def merge_sub_file(in_dir, out_file):
-    fout = open(out_file, 'w')
+    fout = open(out_file, 'w', encoding='utf-8')
     file_list = os.listdir(in_dir)
     for i in file_list:
-        fin = open(in_dir + i, 'r')
+        fin = open(in_dir + i, 'r', encoding='utf-8')
         try:
             for line in fin:
                 fout.writelines(line)
@@ -21,7 +21,7 @@ def mk_sub_file(buf, out_file_path, sub):
         [des_filename, extname] = os.path.splitext(out_file_path)
         out_file_path = des_filename + '_' + str(sub) + extname
     print('make file: %s' % out_file_path)
-    fout = open(out_file_path, 'w')
+    fout = open(out_file_path, 'w', encoding='utf-8')
     try:
         fout.writelines(buf)
         return sub + 1 if sub != -1 else -1
@@ -48,7 +48,7 @@ def split_by_line_count(in_file_path, out_file_path, count=500000):
 
 class Controller:
     def __init__(self):
-        self.kgp = KGProcessor()
+        self.kgp = FirstProcessor()
         self.in_out_file_path = dict()
         self.in_cache = conf.in_sub_file_dir
         self.out_cache = conf.out_sub_file_dir
@@ -68,7 +68,7 @@ class Controller:
     def run(self):
         while self.in_out_file_path:
             _in, _out = self.in_out_file_path.popitem()
-            self.kgp.run_extracting_roughly(_in, _out)
+            self.kgp.run(_in, _out)
         if conf.clear_cache is True:
             merge_sub_file(self.out_cache, conf.out_file_dir + conf.out_file_name)
             self.clear_cache()
@@ -82,7 +82,7 @@ class Controller:
             os.remove(self.out_cache + name)
 
 
-class KGProcessor:
+class FirstProcessor:
     """ 从知识图谱三元组文件中提取新的知识图谱。
 
     第一步为粗略的提取，主要查找三元组的头实体或者尾实体中是否含有指定关键词和黑名单中的词语。
@@ -119,7 +119,7 @@ class KGProcessor:
 
     def first_open_file(self, path):
         self.csv = []
-        with open(path, 'r') as file:
+        with open(path, 'r', encoding='utf-8') as file:
             for line in file:
                 self.csv.append(line)
         file.close()
@@ -128,6 +128,8 @@ class KGProcessor:
         self.financeKG = []
         for members in self.csv:
             member = members.split()
+            if member[1] == 'BaiduCARD':
+                continue
             if self.is_in_finance_words(member[0]) is True and self.is_in_black_list(member[0]) is False:
                 self.financeKG.append(members)
             elif self.is_in_finance_words(member[2]) is True and self.is_in_black_list(member[2]) is False:
@@ -146,12 +148,17 @@ class KGProcessor:
             if container[0] in self.finance_entity_set:
                 self.financeKG.append(line)
 
-    def run_extracting_roughly(self, in_file_path, out_file_path):
+    def run(self, in_file_path, out_file_path):
         self.first_open_file(in_file_path)
         self.second_extract_finance_line_fromCSV()
         self.third_extract_finance_entity_from_financeKG()
         self.fourth_extract_all_finance_line_fromCSV_according_finance_entity()
         mk_sub_file(self.financeKG, out_file_path, -1)
+
+
+class SecondProcessor:
+    def __init__(self):
+        pass
 
 
 if __name__ == '__main__':
